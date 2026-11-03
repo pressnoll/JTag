@@ -1,0 +1,46 @@
+
+name: Build JTag VST3
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure CMake
+        run: cmake -S . -B build -A x64
+
+      - name: Build JTag VST3
+        run: cmake --build build --config Release --target JTag_VST3 --parallel 2
+
+      - name: Collect VST3 plugin
+        shell: pwsh
+        run: |
+          $plugin = Get-ChildItem -Path build -Recurse -Directory -Filter "JTag.vst3" |
+            Select-Object -First 1
+
+          if (-not $plugin) {
+            throw "JTag.vst3 was not found after the build."
+          }
+
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          Copy-Item $plugin.FullName -Destination artifacts -Recurse
+
+      - name: Upload VST3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JTag-Windows-VST3
+          path: artifacts/JTag.vst3
+          if-no-files-found: error
